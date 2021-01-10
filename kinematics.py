@@ -4,10 +4,10 @@ from scipy.spatial import distance
 
 
 class Arm:
-    """"
+    """
     A 6-axis robotic arm that is composed of 2D-constrined links with 
     a turntable base centered at (x,y,z) = (0,0,0). 
-    """"
+    """
     def __init__(self, base_angle, links, angles, angle_constraints, radians=False):
         """Initialize arm and create numpy arrays"""
         self.num_joints = len(links) # number of joints
@@ -15,12 +15,14 @@ class Arm:
         self.links = np.array(links) # length of preceding link
         if not radians:
             self.angles = np.radians(np.array(angles))
+            self.base_angle = np.radians(base_angle) # base angle relative to world
         else:
             self.angles = np.array(angles)
+            self.base_angle = base_angle # base angle relative to world
         self.length = np.sum(self.links)
         self.angle_constraints = np.array(angle_constraints)
-        self.base_angle = base_angle
-        self.base_position = np.array((0,0))
+        self.base_position = np.array((0,0)) # TODO change this
+        self.base_world_position = np.array((0,0,0))
         self.forward_kinematics()
 
     def check_status(self):
@@ -136,7 +138,9 @@ class Arm:
             curr_dist = distance.euclidean(current_e, target)
 
     def signed_arctan(self, coord):
-        return np.arctan(coord[0] / coord[1] + np.pi * (1 - np.sign(coord[0]) / 2))
+        # print("angle", np.arctan(coord[1] / coord[0])*180/np.pi)
+        # print("offset", np.pi * (1 - np.sign(coord[0])) / 2)
+        return np.arctan(coord[1] / coord[0]) + np.pi * (1 - np.sign(coord[0])) / 2
 
     def reach(self, head, tail, link):
         r = distance.euclidean(self.positions[head], self.positions[tail])
@@ -146,17 +150,14 @@ class Arm:
 
     def update_angles(self):
         """Calculate arm angles after FABRIK"""
-        # prev_vec = np.array([1,0])
+        prev_angle = 0
         for i in range(1, self.num_joints):
-            # curr_vec = self.positions[i] - self.positions[i-1]
-            # self.angles[i-1] = np.arccos(np.dot(prev_vec, curr_vec) \
-            #     / (np.linalg.norm(prev_vec, 2) * np.linalg.norm(curr_vec, 2)))
-            # cross = np.cross(prev_vec, curr_vec) # handle negative angles
-            # if cross < 0:
-            #     self.angles[i-1] *= -1
-            self.angles[i-1] = signed_arctan(self.positions[i])
-            # prev_vec = curr_vec
-        print(angles)
+            curr_vec = self.positions[i] - self.positions[i-1]
+            curr_angle = self.signed_arctan(curr_vec) - prev_angle
+            if curr_angle > np.pi: curr_angle -= 2*np.pi
+            elif curr_angle < -np.pi: curr_angle += 2*np.pi
+            self.angles[i-1] = curr_angle
+            prev_angle += curr_angle
 
     def inverse_kinematics_fabrik(self, target):
         """
@@ -172,19 +173,18 @@ class Arm:
             exit(1)
         current_e = self.forward_kinematics()
         curr_dist = distance.euclidean(current_e, target)
-        # iters = 0
         while curr_dist > eps: # usually only takes 1 iteration
             self.positions[-1] = target
             # forward reaching
             for i in range(self.num_joints-2, 0, -1): # start at end
                 self.reach(i+1, i, self.links[i+1])
+            # print(self.positions)
             # backward reaching
             for i in range(1, self.num_joints-1):
                 self.reach(i, i+1, self.links[i+1])
             current_e = self.positions[-1]
             curr_dist = distance.euclidean(current_e, target)
-            # print(curr_dist)
-        self.update_angles()
+        self.update_angles() # update angles based on joint positions
 
     def inverse_kinematics_base(self, target): 
         """
@@ -197,13 +197,14 @@ class Arm:
         - (2,) numpy array: projection of the target onto the plane 
                             given by the base angle
         """
-        # self.base_angle = np.arctan(target[2] / target[0]) # atan(z / x)
         xz_comp = np.array([target[0], target[2]]) # (x,z) components
-        self.base_angle = signed_arctan(xz_comp)
-        # cross = np.cross(np.array[1,0], xz_comp) # handle negative angles
-        # if cross < 0:
-        #     self.base_angle *= -1
-        h = distance.euclidean(base_position, xz_comp)
+        new_base_angle = self.signed_arctan(xz_comp)
+        if new_base_angle > np.pi: new_base_angle -= 2*np.pi
+        elif new_base_angle < -np.pi: new_base_angle += 2*np.pi
+        # print("New angle", new_base_angle * 180 / np.pi)
+        # print("Angle change", (new_base_angle - self.base_angle) * 180 / np.pi)
+        self.base_angle = new_base_angle
+        h = distance.euclidean(self.base_position, xz_comp)
         return np.array((h, target[1]))   
         
     def move_to(self, target, ik="fabrik"):

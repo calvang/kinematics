@@ -4,7 +4,7 @@ import numpy as np
 from kinematics import Arm
 
 def test_jt():
-    arm = Arm(
+    arm = Arm(0,
         np.array([ 0.,   4.,  3.,  2., 1.]),
         np.array([45., -90., 45., 20., 0.]),
         np.array([[0, 180],
@@ -27,7 +27,7 @@ def test_jt():
     arm.plot("plots/testjt4.png")
 
 def test_jpi():
-    arm = Arm(
+    arm = Arm(0,
         np.array([ 0.,   4.,  3.,  2., 1.]),
         np.array([45., -90., 45., 20., 0.]),
         np.array([[0, 180],
@@ -50,7 +50,7 @@ def test_jpi():
     arm.plot("plots/testjpi4.png")
 
 def test_sgd():
-    arm = Arm(
+    arm = Arm(0,
         np.array([ 0.,   4.,  3.,  2., 1.]),
         np.array([45., -90., 45., 20., 0.]),
         np.array([[0, 180],
@@ -73,7 +73,7 @@ def test_sgd():
     arm.plot("plots/testsgd4.png")
 
 def test_fabrik():
-    arm = Arm(
+    arm = Arm(0,
         np.array([ 0.,   4.,  3.,  2., 1.]),
         np.array([45., -90., 45., 20., 0.]),
         np.array([[0, 180],
@@ -95,6 +95,54 @@ def test_fabrik():
     arm.inverse_kinematics_fabrik(target)
     arm.plot("plots/testfabrik4.png")
 
+def test_update_angles():
+    arm = Arm(0,
+        np.array([ 0.,   4.,  3.,  2., 1.]),
+        np.array([45., -90., 45., 20., 0.]),
+        np.array([[0, 180],
+                  [-120, 120],
+                  [-120, 120],
+                  [-120, 120],
+                  [0, 0]]))
+    print("Original", arm.angles * 180/np.pi)
+    # arm.forward_kinematics()
+    arm.update_angles()
+    print("Updated", arm.angles * 180/np.pi)
+    arm.angles = np.radians(np.array([120, -20, -90, -30, 0]))
+    arm.forward_kinematics()
+    print("Original", arm.angles * 180/np.pi)
+    arm.update_angles()
+    print("Updated", arm.angles * 180/np.pi)
+    arm.angles = np.radians(np.array([180, 120, 120, 120, 0]))
+    arm.forward_kinematics()
+    print("Original", arm.angles * 180/np.pi)
+    arm.update_angles()
+    print("Updated", arm.angles * 180/np.pi)
+    arm.angles = np.radians(np.array([9, 120, 40, 50, 0]))
+    arm.forward_kinematics()
+    print("Original", arm.angles * 180/np.pi)
+    arm.update_angles()
+    print("Updated", arm.angles * 180/np.pi)
+
+def test_base_angle():
+    arm = Arm(90,
+        np.array([ 0.,   4.,  3.,  2., 1.]),
+        np.array([45., -90., 45., 20., 0.]),
+        np.array([[0, 180],
+                  [-120, 120],
+                  [-120, 120],
+                  [-120, 120],
+                  [0, 0]]))
+    target = np.array((1,1,1))
+    print(arm.inverse_kinematics_base(target))
+    target = np.array((1,1,-1))
+    print(arm.inverse_kinematics_base(target))
+    target = np.array((-1,1,1))
+    print(arm.inverse_kinematics_base(target))
+    target = np.array((-1,1,-1))
+    print(arm.inverse_kinematics_base(target))
+
+
 if __name__ == "__main__":
     start = time.time()
     test_sgd()
@@ -108,3 +156,6 @@ if __name__ == "__main__":
     start = time.time()
     test_fabrik()
     print("FABRIK: ", time.time() - start)
+    print("Running misc. tests...")
+    test_update_angles()
+    test_base_angle()
